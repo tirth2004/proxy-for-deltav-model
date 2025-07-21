@@ -1,11 +1,24 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
+from fastapi.responses import StreamingResponse
+from fastapi.responses import PlainTextResponse
 from google import genai
 from google.genai import types
 import os
+from fastapi.middleware.cors import CORSMiddleware
+import asyncio
 
 app = FastAPI()
+
+# Allow all origins for CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class GenerateRequest(BaseModel):
     text: str
@@ -90,7 +103,7 @@ If founder over-explains known problem or TAM, tell them to cut and reallocate t
             temperature=1,
             top_p=1,
             seed=0,
-            max_output_tokens=2048,
+            max_output_tokens=65535,
             safety_settings=[
                 types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
                 types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
@@ -107,9 +120,10 @@ If founder over-explains known problem or TAM, tell them to cut and reallocate t
             contents=contents,
             config=generate_content_config,
         ):
-            output += chunk.text
+            if chunk.text is not None:
+                output += chunk.text
 
-        return JSONResponse(content={"result": output})
+        return PlainTextResponse(output)
 
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500) 
